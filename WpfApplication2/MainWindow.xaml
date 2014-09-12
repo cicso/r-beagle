@@ -8,7 +8,7 @@
         <SolidColorBrush x:Key="allBackground" Color="#66000000" />
         <SolidColorBrush x:Key="allForeground" Color="#FFFFFFFF" />
         <SolidColorBrush x:Key="allBorder" Color="#7F91543C" />
-        
+
         <Style TargetType="CheckBox" BasedOn="{StaticResource {x:Type CheckBox}}">
             <Setter Property="Foreground" Value="{DynamicResource allForeground}" />
             <Setter Property="Background" Value="{DynamicResource allBackground}" />
@@ -127,7 +127,7 @@
             HorizontalAlignment="Left" 
             Margin="10,91,0,0" 
             VerticalAlignment="Top"/>
-        <TextBox
+        <TextBox x:Name="searchStrings"
             AcceptsReturn="True" 
             HorizontalAlignment="Left" 
             Height="234" 
@@ -143,7 +143,7 @@
             HorizontalAlignment="Left" 
             Margin="178,365,0,0"
             VerticalAlignment="Top"/>
-        <TextBox 
+        <TextBox x:Name="fileType" 
             HorizontalAlignment="Left"
             Margin="270,369,0,0" 
             TextWrapping="Wrap"
@@ -153,51 +153,50 @@
             TextAlignment="Center"
             MaxLength="7" 
             Height="16" Padding="0"/>
-        <RadioButton 
+        <RadioButton x:Name="typeMatch" 
             Content="Совпадения"
             HorizontalAlignment="Left"
             Margin="180,401,0,0" 
             VerticalAlignment="Top"
             IsChecked="True"/>
-        <RadioButton
+        <RadioButton x:Name="typeDiff"
             Content="Не совпадения"
             HorizontalAlignment="Left"
             Margin="180,420,0,0" 
             VerticalAlignment="Top"/>
-        <Button
+        <Button x:Name="searchStart"
             Content="Начать поиск" 
             HorizontalAlignment="Left"
             Margin="10,471,0,0" 
             VerticalAlignment="Top" 
             Width="244" 
-            Click="Button_Click" 
             Height="21" 
-            FontWeight="Bold"/>
-        <Button
+            FontWeight="Bold" Click="searchStart_Click"/>
+        <Button x:Name="searchCancel"
             Content="Остановить"
             HorizontalAlignment="Left"
             Margin="259,471,0,0"
             VerticalAlignment="Top"
             Width="75"
-            Height="21" />
-        <CheckBox
+            Height="21" IsEnabled="False" Click="searchCancel_Click" />
+        <CheckBox x:Name="keyRegister"
             Content="Учитывать регистр"
             HorizontalAlignment="Left" 
             Margin="10,372,0,0" 
             VerticalAlignment="Top"
             IsChecked="True"/>
-        <CheckBox
+        <CheckBox x:Name="keyOneString"
             Content="Одна строка"
             HorizontalAlignment="Left"
             Margin="10,400,0,0" 
             VerticalAlignment="Top" />
-        <CheckBox 
+        <CheckBox x:Name="keyAllString" 
             Content="Все строки" 
             HorizontalAlignment="Left"
             Margin="10,420,0,0"
             VerticalAlignment="Top" />
         <ProgressBar
-            x:Name="myProgBar" 
+            x:Name="progressBar" 
             Height="13"
             Margin="10,453,10,0" 
             VerticalAlignment="Top" 
@@ -205,12 +204,12 @@
             BorderBrush="{DynamicResource allBorder}" 
             Value="50"
             Foreground="#3F99FF82" 
-            FontFamily="Verdana"/>
+            FontFamily="Verdana" Visibility="Hidden"/>
         <TextBlock 
             HorizontalAlignment="Center"
             Margin="10,453,10,34"
             TextWrapping="Wrap" 
-            Text="{Binding Value, ElementName=myProgBar, Mode=OneWay, StringFormat=\{0\} %}" 
+            Text="{Binding Value, ElementName=progressBar, Mode=OneWay, StringFormat=\{0\} %}" 
             VerticalAlignment="Center"
             Height="13"
             Width="324"
@@ -218,6 +217,7 @@
             Foreground="{DynamicResource allForeground}" 
             TextAlignment="Center"
             FontSize="10" 
+            Visibility="{Binding Visibility, ElementName=progressBar, Mode=OneWay}"
             FontWeight="Bold"/>
     </Grid>
 </Window>
