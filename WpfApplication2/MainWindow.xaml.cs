@@ -27,10 +27,10 @@ namespace WpfApplication2
         private System.ComponentModel.BackgroundWorker searchAsync;
         private string optionsFile;
         private Dictionary<string, List<string>> finderResult;
-        private FType finderType;
-        private int finderTotal = 0;
-        private int finderCurrent = 0;
-        private int finderMatch = 0;
+        private FType searchType;
+        private int searchTotal = 0;
+        private int searchCurrent = 0;
+        private int searchMatch = 0;
 
         public MainWindow()
         {
@@ -55,7 +55,7 @@ namespace WpfApplication2
         private void clear()
         {
             finderResult = new Dictionary<string, List<string>>();
-            finderCurrent = finderTotal = 0;
+            searchCurrent = searchTotal = 0;
         }
 
         private void enableControl(bool state = false)
