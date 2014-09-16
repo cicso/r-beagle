@@ -5,7 +5,7 @@ using System.Data;
 using System.Linq;
 using System.Windows;
 
-namespace WpfApplication2
+namespace resourcer
 {
     /// <summary>
     /// Логика взаимодействия для App.xaml

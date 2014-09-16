@@ -10,7 +10,7 @@ using System.Runtime.InteropServices;
 using System.Windows.Media;
 using System.Collections;
 
-namespace WpfApplication2
+namespace resourcer
 { 
     public partial class DefaultStyle : ResourceDictionary
     {

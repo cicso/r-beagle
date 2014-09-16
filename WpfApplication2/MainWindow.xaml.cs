@@ -15,8 +15,9 @@ using System.Windows.Forms;
 using System.Collections;
 using System.IO;
 using System.Xml;
+using System.Threading;
 
-namespace WpfApplication2
+namespace resourcer
 {
     enum FType { MATCH, DIFF };
     /// <summary>
@@ -26,7 +27,7 @@ namespace WpfApplication2
     {
         private System.ComponentModel.BackgroundWorker searchAsync;
         private string optionsFile;
-        private Dictionary<string, List<string>> finderResult;
+        private Dictionary<string, List<string>> searchResult;
         private FType searchType;
         private int searchTotal = 0;
         private int searchCurrent = 0;
@@ -54,7 +55,7 @@ namespace WpfApplication2
         // ------------------------------------------------------------
         private void clear()
         {
-            finderResult = new Dictionary<string, List<string>>();
+            searchResult = new Dictionary<string, List<string>>();
             searchCurrent = searchTotal = 0;
         }
 
@@ -186,6 +187,55 @@ namespace WpfApplication2
             xml.Close();
         }
 
+        // ------------------------------------------------------------
+        // Делегаты
+        // ------------------------------------------------------------
+        private delegate void delegateNoParam();
+        private delegate void delegateStrStr(string key, string file);
+
+        // ------------------------------------------------------------
+        // Изменение прогресс бара
+        // ------------------------------------------------------------
+        private void changeBar()
+        {
+            progressBar.IsIndeterminate = false;
+            progressBar.Value = 0;
+            //progressInfo.Text = string.Format(lang.searchFiles, finderTotal);
+        }
+
+        // ------------------------------------------------------------
+        // Добавление найденых файлов
+        // ------------------------------------------------------------
+        private void finderAddMatch(string key, string file)
+        {
+            // добавляем переданый ключ если его нет в списке
+            if (!searchResult.ContainsKey(key))
+                searchResult.Add(key, new List<string>());
+            // добавляем файл и увеличиваем счетчик
+            searchResult[key].Add(file);
+            searchMatch++;
+        }
+
+        // ------------------------------------------------------------
+        // Обновление счеткика найденых файлов
+        // ------------------------------------------------------------
+        private void updateCount()
+        {
+            searchTotal++;
+            //progressInfo.Text = string.Format(lang.searchFiles, searchTotal);
+        }
+
+        // ------------------------------------------------------------
+        // Обновление счетчика провереных файлов
+        // ------------------------------------------------------------
+        private void updateChecked()
+        {
+            searchCurrent++;
+            // показываем каждый 11 файл
+            //if (searchCurrent % 11 == 0)
+                //progressInfo.Text = string.Format(lang.searchMatch, searchTotal - searchCurrent, searchMatch);
+        }
+
 
         private void folderAdd_Click(object sender, RoutedEventArgs e)
         {
@@ -208,29 +258,229 @@ namespace WpfApplication2
 
         private void searchAsync_work(object sender, System.ComponentModel.DoWorkEventArgs e)
         {
+            System.ComponentModel.BackgroundWorker worker = (System.ComponentModel.BackgroundWorker)sender;
+            List<string> list = new List<string>();
 
+            // ищем в указаных папках все файлы с подходящим типом
+            // найденые файлы записываем в массив
+            try
+            {
+                for (int i = 0; i < folderList.Items.Count; i++)
+                {
+                    var files = Directory.EnumerateFiles(folderList.Items[i].ToString(), "*" + fileType.Text, SearchOption.AllDirectories);
+                    foreach (string file in files)
+                    {
+                        // Invoke(new delegateNoParam(updateCount));
+
+                        // прерывание выполнения
+                        if (worker.CancellationPending)
+                        {
+                            e.Cancel = true;
+                            break;
+                        }
+                    }
+                    list.AddRange(files);
+                }
+            }
+            catch (Exception error)
+            {
+                System.Windows.Forms.MessageBox.Show(error.Message, "Ошибка 2", MessageBoxButtons.OK);
+            }
+
+            // изменяем прогресс бар и инфу о поиске
+            // Invoke(new delegateNoParam(changeBar));
+
+            // данные для поиска по файлам
+            string find_data = ((bool)keyRegister.IsChecked) ? searchStrings.Text : searchStrings.Text.ToLower();
+            string[] words = find_data.Split(new string[] { "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+            bool next = false;
+
+            float step = 100 / (float)(words.Length * list.Count);
+            float count = 0;
+            int percent = 0;
+
+            // перебераем все файлы
+            foreach (string file in list)
+            {
+                // 
+                if (worker.CancellationPending)
+                {
+                    e.Cancel = true;
+                    break;
+                }
+
+                // нет файла - пропускаем
+                if (!File.Exists(file)) continue;
+
+                // читаем файл и сбрасываем регист если нужно
+                string file_text = File.ReadAllText(file);
+                if (!(bool)keyRegister.IsChecked)
+                    file_text = file_text.ToLower();
+
+                // если не выбрано "все строки"
+                if (!(bool)keyAllString.IsChecked)
+                {
+                    // перебираем слова для поиска
+                    foreach (string word in words)
+                    {
+                        // 
+                        if (worker.CancellationPending)
+                        {
+                            e.Cancel = true;
+                            break;
+                        }
+                        // записываем файл если он подходит
+                        if ((searchType == FType.MATCH && file_text.IndexOf(word) >= 0) ||
+                            (searchType == FType.DIFF && file_text.IndexOf(word) == -1))
+                        {
+                            // Invoke(new delegateStrStr(finderAddMatch), new Object[] { word, file });
+                            // больше не проверяем слова если включено "одна строка"
+                            if ((bool)keyOneString.IsChecked)
+                                break;
+                        }
+                        // обновляем счетчик
+                        if (!(bool)keyOneString.IsChecked)
+                        {
+                            count++;
+                            float p = count * step;
+                            if ((int)p > percent)
+                            {
+                                percent = (int)p;
+                                worker.ReportProgress(percent);
+                            }
+                        }
+
+                    }
+                    // обновляем счетчик
+                    if ((bool)keyOneString.IsChecked)
+                    {
+                        count += words.Length;
+                        float p = count * step;
+                        if ((int)p > percent)
+                        {
+                            percent = (int)p;
+                            worker.ReportProgress(percent);
+                        }
+                    }
+                }
+                // если выбрано "все строки"
+                else
+                {
+                    next = true;
+                    // перебираем слова
+                    foreach (string word in words)
+                    {
+                        if (worker.CancellationPending)
+                        {
+                            e.Cancel = true;
+                            break;
+                        }
+                        // переодим к следующему файлу если не совпала строка
+                        if ((searchType == FType.DIFF && file_text.IndexOf(word) >= 0) ||
+                            (searchType == FType.MATCH && file_text.IndexOf(word) == -1))
+                        {
+                            next = false;
+                            break;
+                        }
+                    }
+                    // записываем файл если совпали все строка
+                    if (next)
+                    {
+                        /*Invoke(
+                            new delegateStrStr(finderAddMatch), new Object[] { 
+                            searchType == FType.MATCH ? lang.stringAll : lang.stringNone, 
+                            file }
+                        );*/
+                    }
+                    // обновляем счетчик
+                    count += words.Length;
+                    float p = count * step;
+                    if ((int)p > percent)
+                    {
+                        percent = (int)p;
+                        worker.ReportProgress(percent);
+                    }
+                }
+                // Invoke(new delegateNoParam(updateChecked));
+            }
         }
 
         private void searchAsync_progress(object sender, System.ComponentModel.ProgressChangedEventArgs e)
         {
-    
+            progressBar.Value = e.ProgressPercentage;
         }
 
         private void searchAsync_complete(object sender, System.ComponentModel.RunWorkerCompletedEventArgs e)
         {
+            // скрываем прогресс бар
+            progressBar.Visibility = System.Windows.Visibility.Hidden;
+            progressBar.Value = 0;
 
+            // востанавливаем управление
+            enableControl(true);
+
+            // выводим сообщение если прервалось из за ошибки
+            if (e.Error != null)
+            {
+                System.Windows.Forms.MessageBox.Show(e.Error.Message, "Ошибка 1", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+            // выводим сообщение если вручную остановили поиск
+            else if (e.Cancelled)
+            {
+                System.Windows.Forms.MessageBox.Show("Поиск отменен", "Инфо 1", MessageBoxButtons.OK);
+                //progressInfo.Text = lang.searchStop;
+                return;
+            }
+
+            // обновляем инфо о поиске
+            //progressInfo.Text = string.Format(lang.searchDone, finderCurrent, finderMatch);
+
+            // новая форма для вывода найденых файлов
+            ResultWindow win = new ResultWindow();
+            // win.Result(fileType.Text, searchResult);
+            win.Show();
         }
 
         private void searchStart_Click(object sender, RoutedEventArgs e)
         {
+            // проверка данных: папки, слова для поиска и маска файлов
+            if (folderList.Items.Count < 1)
+            {
+                System.Windows.Forms.MessageBox.Show("Выберите папку для поиска", "Инфо 2", MessageBoxButtons.OK);
+                return;
+            }
+            if (searchStrings.Text.Length < 3)
+            {
+                System.Windows.Forms.MessageBox.Show("Строка поиска меньше 3 символов", "Инфо 3", MessageBoxButtons.OK);
+                return;
+            }
+            if (fileType.Text.Length < 2)
+            {
+                System.Windows.Forms.MessageBox.Show("Тип файла меньше 2 символов", "Инфо 4", MessageBoxButtons.OK);
+                return;
+            }
+
+            // сбрасываем данные и блокируем управление
+            clear();
             enableControl(false);
+
+
+            // отображаем прогресс бар
+            progressBar.IsIndeterminate = true;
+            progressBar.Value = 0;
+            progressBar.Visibility = System.Windows.Visibility.Visible;
+
             // соxраняем данные для последующего использования
             optionsSave();
+
+            // запускаем отдельный поток с поиском
+            searchAsync.RunWorkerAsync();
         }
 
         private void searchCancel_Click(object sender, RoutedEventArgs e)
         {
-            enableControl(true);
+            searchAsync.CancelAsync();
         }
     }
 }
