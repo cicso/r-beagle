@@ -205,11 +205,11 @@
             Value="50"
             Foreground="#3F99FF82" 
             FontFamily="Verdana" IsIndeterminate="True" Visibility="Hidden"/>
-        <TextBlock 
+        <TextBlock x:Name="progressInfo" 
             HorizontalAlignment="Center"
             Margin="10,453,10,34"
             TextWrapping="Wrap" 
-            Text="{Binding Value, ElementName=progressBar, Mode=OneWay, StringFormat=\{0\} %}" 
+            Text="" 
             VerticalAlignment="Center"
             Height="13"
             Width="324"
