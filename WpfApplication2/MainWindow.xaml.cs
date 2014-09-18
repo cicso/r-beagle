@@ -35,8 +35,12 @@ namespace resourcer
 
         // for test
         private List<string> searchDataDirectory;
-        private List<string> searchDataStrings;
+        private string searchDataStrings;
         private string searchDataMask;
+        private bool searchDataRegister;
+        private bool searchDataAllString;
+        private bool searchDataOneString;
+        private bool searchDataMatch;
 
         public MainWindow()
         {
@@ -62,7 +66,10 @@ namespace resourcer
         {
             searchDataDirectory = new List<string>();
             searchResult = new Dictionary<string, List<string>>();
-            searchCurrent = searchTotal = 0;
+            searchCurrent = searchTotal = searchMatch = 0;
+
+            searchDataDirectory = new List<string>();
+            searchDataStrings = "";
         }
 
         private void enableControl(bool state = false)
@@ -205,62 +212,31 @@ namespace resourcer
             searchResult[key].Add(file);
             searchMatch++;
         }
-
-        // ------------------------------------------------------------
-        // Обновление счетчика провереных файлов
-        // ------------------------------------------------------------
-        private void updateChecked()
-        {
-            searchCurrent++;
-            // показываем каждый 11 файл
-            //if (searchCurrent % 11 == 0)
-                //progressInfo.Text = string.Format(lang.searchMatch, searchTotal - searchCurrent, searchMatch);
-        }
-
-
-        private void folderAdd_Click(object sender, RoutedEventArgs e)
-        {
-            var dialog = new FolderBrowserDialog();
-            if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-            {
-                ListBoxItem item = new ListBoxItem();
-                item.Content = dialog.SelectedPath;
-                item.ToolTip = item.Content;
-                folderList.Items.Add(item);
-            }
-        }
-
-        private void folderDel_Click(object sender, RoutedEventArgs e)
-        {
-            var selecter = new List<ListBoxItem>(folderList.SelectedItems.Cast<ListBoxItem>());
-            foreach (ListBoxItem item in selecter)
-                folderList.Items.Remove(item);
-        }
-
+        
         private void searchAsync_work(object sender, System.ComponentModel.DoWorkEventArgs e)
         {
             System.ComponentModel.BackgroundWorker worker = (System.ComponentModel.BackgroundWorker)sender;
-
-            // for test
-            for (int i = 0; i < searchDataDirectory.Count; i++)
-                System.Diagnostics.Debug.WriteLine(searchDataDirectory[i]);
-
             List<string> list = new List<string>();
+
             // ищем в указаных папках все файлы с подходящим типом
             // найденые файлы записываем в массив
             try
             {
-                for (int i = 0; i < folderList.Items.Count; i++)
+                for (int i = 0; i < searchDataDirectory.Count; i++)
                 {
+                    /*
+                     * Метод основаный на запросе нужных данных из другого потока
+                     * 
+                    
                     // получаем маску
                     string mask = "*.*";
                     fileType.Dispatcher.Invoke((ThreadStart)delegate { mask = "*." + fileType.Text; });
 
                     // получаем данные папок
                     string path = "";
-                    folderList.Items.Dispatcher.Invoke((ThreadStart)delegate { path = ((ListBoxItem)folderList.Items[i]).Content.ToString(); });
-                                        
-                    var files = Directory.EnumerateFiles(path, mask, SearchOption.AllDirectories);
+                    folderList.Items.Dispatcher.Invoke((ThreadStart)delegate { path = ((ListBoxItem)folderList.Items[i]).Content.ToString(); }); */
+
+                    var files = Directory.EnumerateFiles(searchDataDirectory[i], "*." + searchDataMask, SearchOption.AllDirectories);
                     foreach (string file in files)
                     {
                         // Invoke(new delegateNoParam(updateCount));
@@ -278,7 +254,7 @@ namespace resourcer
             }
             catch (Exception error)
             {
-                System.Windows.Forms.MessageBox.Show(error.ToString(), "Ошибка 2", MessageBoxButtons.OK);
+                System.Windows.Forms.MessageBox.Show(error.Message, "Ошибка", MessageBoxButtons.OK);
             }
 
             // изменяем прогресс бар и инфу о поиске
@@ -287,7 +263,7 @@ namespace resourcer
             // данные для поиска по файлам
             try
             {
-                string find_data = ((bool)keyRegister.IsChecked) ? searchStrings.Text : searchStrings.Text.ToLower();
+                string find_data = searchDataRegister ? searchDataStrings : searchDataStrings.ToLower();
                 string[] words = find_data.Split(new string[] { "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries);
                 bool next = false;
 
@@ -310,11 +286,11 @@ namespace resourcer
 
                     // читаем файл и сбрасываем регист если нужно
                     string file_text = File.ReadAllText(file);
-                    if (!(bool)keyRegister.IsChecked)
+                    if (!searchDataRegister)
                         file_text = file_text.ToLower();
 
                     // если не выбрано "все строки"
-                    if (!(bool)keyAllString.IsChecked)
+                    if (!searchDataAllString)
                     {
                         // перебираем слова для поиска
                         foreach (string word in words)
@@ -329,13 +305,13 @@ namespace resourcer
                             if ((searchType == FType.MATCH && file_text.IndexOf(word) >= 0) ||
                                 (searchType == FType.DIFF && file_text.IndexOf(word) == -1))
                             {
-                                // Invoke(new delegateStrStr(finderAddMatch), new Object[] { word, file });
+                                this.Dispatcher.Invoke(new Action(() => finderAddMatch(word, file)));
                                 // больше не проверяем слова если включено "одна строка"
-                                if ((bool)keyOneString.IsChecked)
+                                if (searchDataOneString)
                                     break;
                             }
                             // обновляем счетчик
-                            if (!(bool)keyOneString.IsChecked)
+                            if (!searchDataOneString)
                             {
                                 count++;
                                 float p = count * step;
@@ -348,7 +324,7 @@ namespace resourcer
 
                         }
                         // обновляем счетчик
-                        if ((bool)keyOneString.IsChecked)
+                        if (searchDataOneString)
                         {
                             count += words.Length;
                             float p = count * step;
@@ -382,11 +358,9 @@ namespace resourcer
                         // записываем файл если совпали все строка
                         if (next)
                         {
-                            /*Invoke(
-                                new delegateStrStr(finderAddMatch), new Object[] { 
-                                searchType == FType.MATCH ? lang.stringAll : lang.stringNone, 
-                                file }
-                            );*/
+                            this.Dispatcher.Invoke(new Action(() => finderAddMatch(
+                                searchType == FType.MATCH ? "Совпадения" : "Не совпадения",
+                                file)));
                         }
                         // обновляем счетчик
                         count += words.Length;
@@ -397,12 +371,12 @@ namespace resourcer
                             worker.ReportProgress(percent);
                         }
                     }
-                    // Invoke(new delegateNoParam(updateChecked));
+                    worker.ReportProgress(0, "update_checked");
                 }
             }
             catch (Exception error)
             {
-                System.Windows.Forms.MessageBox.Show(error.ToString(), "Ошибка 3", MessageBoxButtons.OK);
+                System.Windows.Forms.MessageBox.Show(error.Message, "Ошибка", MessageBoxButtons.OK);
             }
         }
 
@@ -418,6 +392,12 @@ namespace resourcer
                     progressBar.IsIndeterminate = false;
                     progressBar.Value = 0;
                     progressInfo.Text = string.Format("Проверено 0 из {0}", searchTotal);
+                    break;
+                case "update_checked":
+                    searchCurrent++;
+                    // показываем каждый 11 файл
+                    if (searchCurrent % 11 == 0)
+                        progressInfo.Text = string.Format("Осталось проверить: {0}, совпадений: {1}", searchTotal - searchCurrent, searchMatch);
                     break;
                 default:
                     progressBar.Value = e.ProgressPercentage;
@@ -437,13 +417,13 @@ namespace resourcer
             // выводим сообщение если прервалось из за ошибки
             if (e.Error != null)
             {
-                System.Windows.Forms.MessageBox.Show(e.Error.Message, "Ошибка 1", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                System.Windows.Forms.MessageBox.Show(e.Error.Message, "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
             // выводим сообщение если вручную остановили поиск
             else if (e.Cancelled)
             {
-                System.Windows.Forms.MessageBox.Show("Поиск отменен", "Инфо 1", MessageBoxButtons.OK);
+                System.Windows.Forms.MessageBox.Show("Поиск отменен", "Инфо", MessageBoxButtons.OK);
                 //progressInfo.Text = lang.searchStop;
                 return;
             }
@@ -453,7 +433,7 @@ namespace resourcer
 
             // новая форма для вывода найденых файлов
             ResultWindow win = new ResultWindow();
-            // win.Result(fileType.Text, searchResult);
+            win.Result(fileType.Text, searchResult);
             win.Show();
         }
 
@@ -462,17 +442,17 @@ namespace resourcer
             // проверка данных: папки, слова для поиска и маска файлов
             if (folderList.Items.Count < 1)
             {
-                System.Windows.Forms.MessageBox.Show("Выберите папку для поиска", "Инфо 2", MessageBoxButtons.OK);
+                System.Windows.Forms.MessageBox.Show("Выберите папку для поиска", "Инфо", MessageBoxButtons.OK);
                 return;
             }
             if (searchStrings.Text.Length < 3)
             {
-                System.Windows.Forms.MessageBox.Show("Строка поиска меньше 3 символов", "Инфо 3", MessageBoxButtons.OK);
+                System.Windows.Forms.MessageBox.Show("Строка поиска меньше 3 символов", "Инфо", MessageBoxButtons.OK);
                 return;
             }
-            if (fileType.Text.Length < 2)
+            if (fileType.Text.Length < 1)
             {
-                System.Windows.Forms.MessageBox.Show("Тип файла меньше 2 символов", "Инфо 4", MessageBoxButtons.OK);
+                System.Windows.Forms.MessageBox.Show("Укажите тип файла", "Инфо", MessageBoxButtons.OK);
                 return;
             }
 
@@ -491,12 +471,16 @@ namespace resourcer
             // соxраняем данные для последующего использования
             optionsSave();
 
-
-            //
-            var selecter = new List<ListBoxItem>(folderList.Items.Cast<ListBoxItem>());
-            foreach (ListBoxItem item in selecter)
+            // все нужные данные пишем в переменную
+            foreach (ListBoxItem item in folderList.Items.Cast<ListBoxItem>())
                 searchDataDirectory.Add(item.Content.ToString());
 
+            searchDataMask = fileType.Text;
+            searchDataStrings = searchStrings.Text;
+            searchDataAllString = (bool)keyAllString.IsChecked;
+            searchDataOneString = (bool)keyOneString.IsChecked;
+            searchDataRegister = (bool)keyRegister.IsChecked;
+            searchDataMatch = (bool)typeMatch.IsChecked;
 
             // запускаем отдельный поток с поиском
             searchAsync.RunWorkerAsync();
@@ -506,27 +490,34 @@ namespace resourcer
         {
             searchAsync.CancelAsync();
         }
-    }
 
-
-
-
-
-    public static class ControlExtensions
-    {
-        public static void InvokeIfRequired(this System.Windows.Controls.Control control, Action action)
+        private void typeMatch_Checked(object sender, RoutedEventArgs e)
         {
-            if (System.Threading.Thread.CurrentThread != control.Dispatcher.Thread)
-                control.Dispatcher.Invoke(action);
-            else
-                action();
+            searchType = FType.MATCH;
         }
-        public static void InvokeIfRequired<T>(this System.Windows.Controls.Control control, Action<T> action, T parameter)
+
+        private void typeDiff_Checked(object sender, RoutedEventArgs e)
         {
-            if (System.Threading.Thread.CurrentThread != control.Dispatcher.Thread)
-                control.Dispatcher.Invoke(action, parameter);
-            else
-                action(parameter);
+            searchType = FType.DIFF;
+        }
+
+        private void folderAdd_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new FolderBrowserDialog();
+            if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+            {
+                ListBoxItem item = new ListBoxItem();
+                item.Content = dialog.SelectedPath;
+                item.ToolTip = item.Content;
+                folderList.Items.Add(item);
+            }
+        }
+
+        private void folderDel_Click(object sender, RoutedEventArgs e)
+        {
+            var selecter = new List<ListBoxItem>(folderList.SelectedItems.Cast<ListBoxItem>());
+            foreach (ListBoxItem item in selecter)
+                folderList.Items.Remove(item);
         }
     }
 }

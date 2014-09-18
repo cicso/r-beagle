@@ -158,12 +158,12 @@
             HorizontalAlignment="Left"
             Margin="180,401,0,0" 
             VerticalAlignment="Top"
-            IsChecked="True"/>
+            IsChecked="True" Checked="typeMatch_Checked"/>
         <RadioButton x:Name="typeDiff"
             Content="Не совпадения"
             HorizontalAlignment="Left"
             Margin="180,420,0,0" 
-            VerticalAlignment="Top"/>
+            VerticalAlignment="Top" Checked="typeDiff_Checked"/>
         <Button x:Name="searchStart"
             Content="Начать поиск" 
             HorizontalAlignment="Left"
