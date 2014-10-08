@@ -18,6 +18,11 @@ namespace resourcer
     /// </summary>
     public partial class ResultWindow : Window
     {
+
+        List<Found> items = new List<Found>();
+        int count = 0;
+        int match = 0;
+
         public ResultWindow()
         {
             InitializeComponent();
@@ -27,24 +32,19 @@ namespace resourcer
 
         public void Result(string filter, Dictionary<string, List<string>> list)
         {
-            int count = 0;
-            int match = 0;
+            count = 0;
+            match = 0;
             copyList = new List<string>();
-
-            // заголовок
-            result.Text = "Результаты поиска по *." + filter + " файлам:\r\n";
 
             foreach (KeyValuePair<string, List<string>> line in list)
             {
-                // вывод заголовка
-                result.AppendText("\r\n\t" + line.Key + " [найдено " + line.Value.Count + "]:\r\n");
                 try
                 {
                     // вывод файлов
                     foreach (string file in line.Value)
                     {
                         // добавляем файл
-                        result.AppendText("\t\t" + file + "\r\n");
+                        items.Add(new Found { file = file, group = line.Key });
                         // если нет в списке для копирования, то добавляем
                         if (!copyList.Contains(file))
                         {
@@ -60,13 +60,10 @@ namespace resourcer
                 }
             }
 
-            // статус
-
-            //statusInfo.Text = "Всего совпадений: " + match;
-
             // если файлов нет, блокируем кнопки чтобы не сохраняли пустой список
             if (count == 0)
             {
+                result.Items.Add(new ListBoxItem() { Content = "Файлов не найдено", Foreground = Brushes.White });
                 //listSave.Enabled = false;
                 //listCopy.Enabled = false;
             }
@@ -103,5 +100,30 @@ namespace resourcer
             if (saveDialog.ShowDialog() == DialogResult.OK)
                 File.WriteAllText(saveDialog.FileName, resultText.Text, Encoding.UTF8);
         }*/
+
+        private void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (count > 0)
+            {
+                System.ComponentModel.ICollectionView view = System.Windows.Data.CollectionViewSource.GetDefaultView(items);
+                view.GroupDescriptions.Add(new System.Windows.Data.PropertyGroupDescription("group"));
+                result.ItemsSource = view;
+            }
+        }
+
+        private void ListBoxItem_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            var select = ((ListBoxItem)sender).Content;
+            if (select is Found && ((Found)select).file != null)
+                System.Diagnostics.Process.Start(((Found)select).file);
+
+        }
     }
+
+    class Found
+    {
+        public string file { get; set; }
+        public string group { get; set; }
+    }
+
 }
